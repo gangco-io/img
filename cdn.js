@@ -7,16 +7,42 @@ const path = require('path');
 const app = express();
 const OUTPUT_PATH = 'compressed/';
 
-// Multer configuration for file upload
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'uploads/') // Destination folder for uploaded images
+    cb(null, 'uploads/'); // Destination folder for uploaded images
   },
   filename: function (req, file, cb) {
     cb(null, file.originalname); // Preserve the original filename
   }
 });
-const upload = multer({ storage: storage });
+
+// Define a file filter function to allow only images
+const imageFilter = function (req, file, cb) {
+  if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/)) {
+// Reject non-image files
+    req.fileError = new Error('Only image files are allowed!');
+    return cb(req.fileError, false);
+}
+  // Accept image files
+  cb(null, true);
+};
+
+const upload = multer({ storage: storage, fileFilter: imageFilter });
+
+// Error handler middleware
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    // Multer errors (e.g., file filter errors)
+    return res.status(400).json({ error: err.message });
+  } else if (req.fileError) {
+    // Custom file filter error message
+    return res.status(400).json({ error: req.fileError.message });
+  } else {
+    // Other errors
+    console.error(err.stack);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
 
 // Route for uploading image and compressing
 app.post('/upload', upload.single('image'), async (req, res) => {
